@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// server/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Usuarios y Autenticación
+model User {
+  id            String    @id @default(cuid()) // CUID es más seguro que UUID para webs
+  name          String?
+  email         String    @unique
+  image         String?
+  password      String?   // Opcional por si entran con Google
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  
+  // Relaciones
+  orders        Order[]
+  rewards       Reward?   // Un usuario tiene un registro de recompensas
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// 2. Sistema de Recompensas (Gamification)
+model Reward {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  points        Int      @default(0) // 1 compra = 1 punto. 5 puntos = Free Coffee
+  freeCoffees   Int      @default(0) // Cafés gratis acumulados
+  updatedAt     DateTime @updatedAt
+}
+
+// 3. Productos (El Café)
+model Product {
+  id          String      @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  image       String
+  category    Category
+  ingredients String[]    // Array de strings nativo de Postgres
+  available   Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  // Relaciones
+  orderItems  OrderItem[]
+}
+
+enum Category {
+  HOT_COFFEE
+  ICED_COFFEE
+  TEA
+  BAKERY
+}
+
+// 4. Órdenes y Transacciones
+model Order {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  total       Float
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+
+  // Detalles de la orden
+  items       OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float   // Precio en el momento de la compra (snapshot)
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  COMPLETED
+  CANCELLED
+}
